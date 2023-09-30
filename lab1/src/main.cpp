@@ -82,6 +82,7 @@ int main(){
             }
         }
         
+        
         close(fd1[1]);
         close(fd2[0]);
     }
