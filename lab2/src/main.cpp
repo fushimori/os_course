@@ -1,133 +1,164 @@
-
 #include <iostream>
 #include <vector>
-#include <thread>
-#include <mutex>
-#include <string>
 #include <cmath>
-#include <cstring>
-#include <atomic>
+#include <limits>
+#include <pthread.h>
+#include <cstdlib>
+#include <random>
+#include <algorithm>
 
-std::vector<std::pair<int, int>> points;
-int num_clusters = 3;
-std::mutex mtx;
-bool errorFlag{false};
+struct Point {
+    double x;
+    double y;
+};
 
-double distance(const std::pair<int, int>& point1, const std::pair<int, int>& point2) {
-    int xDiff = point2.first - point1.first;
-    int yDiff = point2.second - point1.second;
-    return std::sqrt(xDiff * xDiff + yDiff * yDiff);
+struct Args {
+    std::vector<Point>* centroids;
+    std::vector<int> clusters;
+    std::vector<Point> points;
+    int start;
+    int end;
+};
+
+double calculateDistance(Point point1, Point point2) {
+    double x = point2.x - point1.x;
+    double y = point2.y - point1.y;
+    return std::sqrt(x * x + y * y);
 }
 
-void kMeansClustering(std::vector<std::pair<int, int>>& centers, std::vector<std::vector<std::pair<int, int>>>& clusters) {
-    if (points.empty() || static_cast<int>(points.size()) < num_clusters || num_clusters <= 0) {
-        errorFlag = true;
-        return;
+int findNearestCluster(std::vector<Point>& centroids, Point point) {
+    double min_distance = std::numeric_limits<double>::max();
+    int near_cluster = -1;
+
+    for (size_t i = 0; i < centroids.size(); ++i) {
+        double distance = calculateDistance(centroids[i], point);
+
+        if (distance < min_distance) {
+            min_distance = distance;
+            near_cluster = i;
+        }
     }
 
-    clusters.clear();
-    clusters.resize(num_clusters);
+    return near_cluster;
+}
 
-    for (int i = 0; i < num_clusters; ++i) {
-        centers[i] = points[i];
+void* updateCentroids(void* args_void) {
+    auto args = static_cast<Args*>(args_void);
+    std::vector<Point>& centroids = *(args->centroids);
+    std::vector<Point>& points = args->points;
+    std::vector<int>& clusters = args->clusters;
+
+    std::vector<int> count(centroids.size(), 0);
+    std::vector<double> sumX(centroids.size(), 0.0);
+    std::vector<double> sumY(centroids.size(), 0.0);
+
+    for (size_t i = 0; i < points.size(); ++i) {
+        int cluster = clusters[i];
+        count[cluster]++;
+        sumX[cluster] += points[i].x;
+        sumY[cluster] += points[i].y;
     }
 
-    bool done = false;
-    while (!done) {
-        mtx.lock();
-        for (auto& cluster : clusters) {
-            cluster.clear();
+    for (int i = args->start; i < args->end; ++i) {
+        if (count[i] > 0) {
+            centroids[i].x = sumX[i] / count[i];
+            centroids[i].y = sumY[i] / count[i];
         }
-
-        for (const auto& point : points) {
-            double minDist = distance(point, centers[0]);
-            int clusterIndex = 0;
-
-            for (int i = 1; i < num_clusters; ++i) {
-                double dist = distance(point, centers[i]);
-                if (dist < minDist) {
-                    minDist = dist;
-                    clusterIndex = i;
-                }
-            }
-
-            clusters[clusterIndex].push_back(point);
-        }
-
-        std::vector<std::pair<int, int>> prevCenters = centers;
-
-        for (int i = 0; i < num_clusters; ++i) {
-            int totalPoints = clusters[i].size();
-            if (totalPoints > 0) {
-                int sumX = 0, sumY = 0;
-                for (const auto& point : clusters[i]) {
-                    sumX += point.first;
-                    sumY += point.second;
-                }
-                centers[i] = std::make_pair(sumX / totalPoints, sumY / totalPoints);
-            }
-        }
-
-        done = true;
-        for (int i = 0; i < num_clusters; ++i) {
-            if (centers[i] != prevCenters[i]) {
-                done = false;
-                break;
-            }
-        }
-        mtx.unlock();
     }
+
+    return nullptr;
+}
+
+std::vector<int> kMeansClustering(std::vector<Point>& points, std::vector<Point>& init_centroids, int thread_num) {
+    std::vector<Point> centroids = init_centroids;
+    std::vector<int> clusters(points.size(), -1);
+
+    bool update_centroid = true;
+
+    while (update_centroid) {
+        update_centroid = false;
+
+        for (size_t i = 0; i < points.size(); ++i) {
+            int near_cluster = findNearestCluster(centroids, points[i]);
+            if (clusters[i] != near_cluster) {
+                clusters[i] = near_cluster;
+                update_centroid = true;
+            }
+        }
+
+        if (!update_centroid) {
+            break;
+        }
+
+        pthread_t threads[thread_num];
+        std::vector<Args*> args(thread_num);
+
+        int k = centroids.size() / thread_num;
+        int m = centroids.size() % thread_num;
+        int start = 0;
+        int end = k;
+
+        for (int i = 0; i < thread_num; ++i) {
+            if (i < m) {
+                end++;
+            }
+
+            args[i] = new Args{&centroids, clusters, points, start, end};
+            pthread_create(&threads[i], NULL, updateCentroids, static_cast<void*>(args[i]));
+
+            start = end;
+            end += k;
+        }
+        for (int i = 0; i < thread_num; ++i) {
+            pthread_join(threads[i], NULL);
+            delete args[i];
+        }
+    }
+
+    return clusters;
 }
 
 int main(int argc, char* argv[]) {
-    int num_threads = 4;
+    int thread_num = 1;
+    int k = 2;
 
-    if (argc >= 5) {
-        for (int i = 1; i < argc; i += 2) {
-            if (std::strcmp(argv[i], "-p") == 0) {
-                num_threads = std::stoi(argv[i + 1]);
-            }
-            else if (std::strcmp(argv[i], "-c") == 0) {
-                num_clusters = std::stoi(argv[i + 1]);
-            }
-        }
-    }
-    else {
-        std::cout << "Invalid command line arguments, using default values." << std::endl;
+    if (argc > 2) {
+        thread_num = std::atoi(argv[1]);
+        k = std::atoi(argv[2]);
     }
 
-    int x, y;
-    while (std::cin >> x >> y) {
-        std::pair<int, int> pr{ x, y };
-        points.push_back(pr);
+    if (thread_num < 1) {
+        throw std::logic_error("Num of threads must be positive");
     }
 
-    std::vector<std::pair<int, int>> centers(num_clusters);
-    std::vector<std::vector<std::pair<int, int>>> clusters(num_clusters);
-
-    std::vector<std::thread> threads;
-    for (int i = 0; i < num_threads; i++) {
-        threads.push_back(std::thread(kMeansClustering, std::ref(centers), std::ref(clusters)));
+    if (k < 1) {
+        throw std::logic_error("Num of cluster must be positive");
     }
 
-    for (auto& thread : threads) {
-        thread.join();
+    std::vector<Point> points;
+
+    std::vector<Point> init_centroids(k);
+    std::default_random_engine rng(9999);
+    std::uniform_real_distribution<double> dist(-1111111.1, 1111111.1);
+
+    for (int i = 0; i < 10000000; ++i) {
+        double x = dist(rng);
+        double y = dist(rng);
+        points.emplace_back(Point{x, y});
     }
 
-    if (errorFlag) {
-        std::cout << "Error occurred in kMeansClustering. Exiting..." << std::endl;
-        return 1;
-    }
-
-    for (int i = 0; i < num_clusters; ++i) {
-
-        std::cout << "Cluster " << i + 1 << " center: (" << centers[i].first << ", " << centers[i].second << ")\n";
-        std::cout << "Points in cluster " << i + 1 << ":\n";
-        for (const auto& point : clusters[i]) {
-            std::cout << "(" << point.first << ", " << point.second << ")\n";
-        }
-        std::cout << std::endl;
-    }
+    std::sample(points.begin(), points.end(), init_centroids.begin(), k, rng);
+    std::vector<int> clusters = kMeansClustering(points, init_centroids, thread_num);
+     
+    // for (int cluster = 0; cluster < k; ++cluster) {
+    //     std::cout << "Cluster " << cluster + 1 << ":" << std::endl;
+    //     for (size_t i = 0; i < points.size(); ++i) {
+    //         if (clusters[i] == cluster) {
+    //             std::cout << "Point (" << points[i].x << ", " << points[i].y << ")" << std::endl;
+    //         }
+    //     }
+    //     std::cout << std::endl;
+    // }
 
     return 0;
 }
