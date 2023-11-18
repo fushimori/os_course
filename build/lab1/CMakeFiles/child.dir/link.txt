@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/child.dir/src/child.cpp.o CMakeFiles/child.dir/src/composite.cpp.o -o child 

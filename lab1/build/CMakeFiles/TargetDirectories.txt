@@ -1,0 +1,5 @@
+/home/maksim/course2/sem3/os/lab1/build/CMakeFiles/main.dir
+/home/maksim/course2/sem3/os/lab1/build/CMakeFiles/child.dir
+/home/maksim/course2/sem3/os/lab1/build/CMakeFiles/flread.dir
+/home/maksim/course2/sem3/os/lab1/build/CMakeFiles/edit_cache.dir
+/home/maksim/course2/sem3/os/lab1/build/CMakeFiles/rebuild_cache.dir

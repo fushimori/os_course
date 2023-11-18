@@ -1,0 +1,22 @@
+[
+{
+  "directory": "/home/maksim/course2/sem3/os/build/lab1",
+  "command": "/usr/bin/c++   -g -o CMakeFiles/main.dir/src/main.cpp.o -c /home/maksim/course2/sem3/os/lab1/src/main.cpp",
+  "file": "/home/maksim/course2/sem3/os/lab1/src/main.cpp"
+},
+{
+  "directory": "/home/maksim/course2/sem3/os/build/lab1",
+  "command": "/usr/bin/c++   -g -o CMakeFiles/child.dir/src/child.cpp.o -c /home/maksim/course2/sem3/os/lab1/src/child.cpp",
+  "file": "/home/maksim/course2/sem3/os/lab1/src/child.cpp"
+},
+{
+  "directory": "/home/maksim/course2/sem3/os/build/lab1",
+  "command": "/usr/bin/c++   -g -o CMakeFiles/child.dir/src/composite.cpp.o -c /home/maksim/course2/sem3/os/lab1/src/composite.cpp",
+  "file": "/home/maksim/course2/sem3/os/lab1/src/composite.cpp"
+},
+{
+  "directory": "/home/maksim/course2/sem3/os/build/lab1",
+  "command": "/usr/bin/c++   -g -o CMakeFiles/flread.dir/src/filereader.cpp.o -c /home/maksim/course2/sem3/os/lab1/src/filereader.cpp",
+  "file": "/home/maksim/course2/sem3/os/lab1/src/filereader.cpp"
+}
+]

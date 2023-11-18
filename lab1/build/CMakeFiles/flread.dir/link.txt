@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/flread.dir/src/filereader.cpp.o -o flread 
